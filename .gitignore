@@ -1,0 +1,9 @@
+node_modules/
+.env
+uploads/
+dist/
+frontend/node_modules/
+tests/__snapshots__/
+coverage/
+*.log
+.DS_Store
