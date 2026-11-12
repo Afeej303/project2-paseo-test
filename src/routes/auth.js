@@ -32,6 +32,7 @@ router.post('/register/factory', [
   body('contactPhone').trim().notEmpty(),
   handleValidation
 ], async (req, res) => {
+  let user;
   try {
     const { email, password, companyName, contactPerson, contactPhone, ...factoryData } = req.body;
 
@@ -45,7 +46,7 @@ router.post('/register/factory', [
     }
 
     // Create user
-    const user = new User({
+    user = new User({
       email,
       password,
       role: 'factory'
@@ -77,6 +78,13 @@ router.post('/register/factory', [
       }
     });
   } catch (error) {
+    if (user && user._id) {
+      try {
+        await User.findByIdAndDelete(user._id);
+      } catch (rollbackError) {
+        console.error('Factory registration rollback failed:', rollbackError);
+      }
+    }
     console.error('Factory registration error:', error);
     res.status(500).json({
       success: false,
@@ -97,6 +105,7 @@ router.post('/register/technician', [
   body('phone').trim().notEmpty(),
   handleValidation
 ], async (req, res) => {
+  let user;
   try {
     const { email, password, firstName, lastName, phone, ...technicianData } = req.body;
 
@@ -110,7 +119,7 @@ router.post('/register/technician', [
     }
 
     // Create user
-    const user = new User({
+    user = new User({
       email,
       password,
       role: 'technician'
@@ -142,6 +151,13 @@ router.post('/register/technician', [
       }
     });
   } catch (error) {
+    if (user && user._id) {
+      try {
+        await User.findByIdAndDelete(user._id);
+      } catch (rollbackError) {
+        console.error('Technician registration rollback failed:', rollbackError);
+      }
+    }
     console.error('Technician registration error:', error);
     res.status(500).json({
       success: false,
@@ -213,6 +229,13 @@ router.post('/register/admin/bootstrap', [
   handleValidation
 ], async (req, res) => {
   try {
+    if (process.env.ALLOW_ADMIN_BOOTSTRAP !== 'true') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin bootstrap is disabled'
+      });
+    }
+
     // Check if any admin exists
     const existingAdmin = await User.findOne({ role: 'admin' });
     if (existingAdmin) {

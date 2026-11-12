@@ -13,7 +13,8 @@ const faultReportUploadsDir = path.join(uploadsRoot, 'fault-reports');
 fs.mkdirSync(faultReportUploadsDir, { recursive: true });
 
 // Middleware
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

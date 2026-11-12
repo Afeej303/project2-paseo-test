@@ -9,6 +9,7 @@ const Technician = require('../models/Technician');
 const RepairRequest = require('../models/RepairRequest');
 const auth = require('../middleware/auth');
 const { isFactoryOrAdmin } = require('../middleware/roles');
+const { notify } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -74,6 +75,45 @@ const handleValidation = (req, res, next) => {
   next();
 };
 
+// Authorize media uploads before Multer writes any files to disk
+const loadOwnedFaultReport = async (req, res, next) => {
+  try {
+    const faultReport = await FaultReport.findById(req.params.id);
+    if (!faultReport) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fault report not found'
+      });
+    }
+
+    if (req.userRole !== 'admin') {
+      const factory = await Factory.findOne({ userId: req.userId });
+      if (!factory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factory profile not found'
+        });
+      }
+      if (!faultReport.factoryId || faultReport.factoryId.toString() !== factory._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to add media to this fault report'
+        });
+      }
+    }
+
+    req.faultReport = faultReport;
+    next();
+  } catch (error) {
+    console.error('Fault report media authorization error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to authorize media upload',
+      errors: [{ message: error.message }]
+    });
+  }
+};
+
 // @route   POST /api/fault-reports
 // @desc    Create a new fault report
 // @access  Private (Factory)
@@ -84,6 +124,7 @@ router.post('/', [
   body('faultDescription').trim().notEmpty(),
   body('urgency').optional().isIn(['critical', 'high', 'medium', 'low']),
   body('symptoms').optional().isArray(),
+  body('preferredVisitTime').optional({ checkFalsy: true }).isISO8601(),
   handleValidation
 ], async (req, res) => {
   try {
@@ -119,7 +160,7 @@ router.post('/', [
       symptoms: faultReportData.symptoms || [],
       urgency: faultReportData.urgency || 'medium',
       hasStoppedProduction: faultReportData.hasStoppedProduction || false,
-      preferredVisitTime: faultReportData.preferredVisitTime,
+      preferredVisitTime: faultReportData.preferredVisitTime || undefined,
       safetyInstructions: faultReportData.safetyInstructions,
       accessInstructions: faultReportData.accessInstructions
     });
@@ -150,30 +191,12 @@ router.post('/:id/media', [
   auth,
   isFactoryOrAdmin,
   param('id').isMongoId(),
-  uploadMedia,
-  handleValidation
+  handleValidation,
+  loadOwnedFaultReport,
+  uploadMedia
 ], async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const faultReport = await FaultReport.findById(id);
-    if (!faultReport) {
-      return res.status(404).json({
-        success: false,
-        message: 'Fault report not found'
-      });
-    }
-
-    // Check authorization
-    if (req.userRole !== 'admin') {
-      const factory = await Factory.findOne({ userId: req.userId });
-      if (!factory || faultReport.factoryId.toString() !== factory._id.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to add media to this fault report'
-        });
-      }
-    }
+    const faultReport = req.faultReport;
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -284,7 +307,13 @@ router.get('/:id', [
     // Authorization check
     if (req.userRole === 'factory') {
       const factory = await Factory.findOne({ userId: req.userId });
-      if (faultReport.factoryId._id.toString() !== factory._id.toString()) {
+      if (!factory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factory profile not found'
+        });
+      }
+      if (!faultReport.factoryId || faultReport.factoryId._id.toString() !== factory._id.toString()) {
         return res.status(403).json({
           success: false,
           message: 'Not authorized to view this fault report'
@@ -311,6 +340,7 @@ router.get('/:id', [
 // @access  Private (Factory, Technician, Admin)
 router.put('/:id/status', [
   auth,
+  isFactoryOrAdmin,
   param('id').isMongoId(),
   body('status').isIn(['submitted', 'in_progress', 'resolved', 'cancelled']),
   handleValidation
@@ -324,6 +354,22 @@ router.put('/:id/status', [
         success: false,
         message: 'Fault report not found'
       });
+    }
+
+    if (req.userRole !== 'admin') {
+      const factory = await Factory.findOne({ userId: req.userId });
+      if (!factory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factory profile not found'
+        });
+      }
+      if (!faultReport.factoryId || faultReport.factoryId.toString() !== factory._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this fault report'
+        });
+      }
     }
 
     faultReport.status = status;
@@ -354,6 +400,7 @@ router.put('/:id/status', [
 // @access  Private (Admin)
 router.put('/:id/assign', [
   auth,
+  isFactoryOrAdmin,
   param('id').isMongoId(),
   body('technicianId').isMongoId(),
   handleValidation
@@ -361,12 +408,7 @@ router.put('/:id/assign', [
   try {
     const { technicianId } = req.body;
 
-    const faultReport = await FaultReport.findByIdAndUpdate(
-      req.params.id,
-      { assignedTechnicianId: technicianId, status: 'in_progress' },
-      { new: true }
-    ).populate('assignedTechnicianId', 'firstName lastName');
-
+    const faultReport = await FaultReport.findById(req.params.id);
     if (!faultReport) {
       return res.status(404).json({
         success: false,
@@ -374,10 +416,58 @@ router.put('/:id/assign', [
       });
     }
 
+    if (req.userRole !== 'admin') {
+      const factory = await Factory.findOne({ userId: req.userId });
+      if (!factory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factory profile not found'
+        });
+      }
+      if (!faultReport.factoryId || faultReport.factoryId.toString() !== factory._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to assign a technician to this fault report'
+        });
+      }
+    }
+
+    const technician = await Technician.findById(technicianId);
+    if (!technician) {
+      return res.status(404).json({
+        success: false,
+        message: 'Technician not found'
+      });
+    }
+
+    const updatedReport = await FaultReport.findByIdAndUpdate(
+      req.params.id,
+      { assignedTechnicianId: technicianId, status: 'in_progress' },
+      { new: true }
+    ).populate('assignedTechnicianId', 'firstName lastName');
+
+    // Keep the associated repair request dispatchable by the assigned technician
+    const repairRequest = await RepairRequest.findOneAndUpdate(
+      { faultReportId: faultReport._id },
+      { technicianId: technician._id },
+      { new: true }
+    );
+
+    if (repairRequest) {
+      const machineLabel = (faultReport.machineInfo && faultReport.machineInfo.name)
+        || faultReport.faultDescription
+        || 'repair request';
+      await notify(technician.userId, {
+        type: 'repair_request',
+        message: `New repair request assigned: ${machineLabel}`,
+        relatedId: repairRequest._id
+      });
+    }
+
     res.json({
       success: true,
       message: 'Technician assigned successfully',
-      data: faultReport
+      data: updatedReport
     });
   } catch (error) {
     console.error('Assign technician error:', error);

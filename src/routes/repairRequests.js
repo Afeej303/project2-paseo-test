@@ -6,6 +6,7 @@ const Factory = require('../models/Factory');
 const Technician = require('../models/Technician');
 const auth = require('../middleware/auth');
 const { authorize, isFactory, isTechnician, isAdmin } = require('../middleware/roles');
+const { notify } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -44,6 +45,13 @@ router.post('/', [
     }
 
     const factory = await Factory.findOne({ userId: req.userId });
+    if (!factory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factory profile not found'
+      });
+    }
+
     if (faultReport.factoryId.toString() !== factory._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -95,9 +103,13 @@ router.get('/', auth, async (req, res) => {
 
     if (req.userRole === 'factory') {
       const factory = await Factory.findOne({ userId: req.userId });
-      if (factory) {
-        query.factoryId = factory._id;
+      if (!factory) {
+        return res.status(404).json({
+          success: false,
+          message: 'Factory profile not found'
+        });
       }
+      query.factoryId = factory._id;
     } else if (req.userRole === 'technician') {
       const technician = await Technician.findOne({ userId: req.userId });
       if (!technician) {
@@ -205,10 +217,23 @@ router.post('/:id/accept', [
       });
     }
 
+    if (repairRequest.technicianId && repairRequest.technicianId.toString() !== technician._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to accept this repair request'
+      });
+    }
+
     repairRequest.technicianId = technician._id;
     repairRequest.status = 'accepted';
     repairRequest.estimatedArrivalTime = estimatedArrivalTime;
     await repairRequest.save();
+
+    await notify(repairRequest.factoryContactId, {
+      type: 'status_update',
+      message: 'Technician accepted repair request',
+      relatedId: repairRequest._id
+    });
 
     res.json({
       success: true,
@@ -246,6 +271,21 @@ router.post('/:id/reject', [
       });
     }
 
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician) {
+      return res.status(404).json({
+        success: false,
+        message: 'Technician profile not found'
+      });
+    }
+
+    if (repairRequest.technicianId && repairRequest.technicianId.toString() !== technician._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to reject this repair request'
+      });
+    }
+
     if (repairRequest.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -255,6 +295,12 @@ router.post('/:id/reject', [
 
     repairRequest.status = 'rejected';
     await repairRequest.save();
+
+    await notify(repairRequest.factoryContactId, {
+      type: 'status_update',
+      message: 'Technician rejected repair request',
+      relatedId: repairRequest._id
+    });
 
     res.json({
       success: true,
@@ -363,6 +409,24 @@ router.put('/:id/status', [
 
     await repairRequest.save();
 
+    let recipientId = null;
+    if (req.userRole === 'technician') {
+      recipientId = repairRequest.factoryContactId;
+    } else if ((req.userRole === 'factory' || req.userRole === 'admin') && repairRequest.technicianId) {
+      const assignedTechnician = await Technician.findById(repairRequest.technicianId);
+      if (assignedTechnician) {
+        recipientId = assignedTechnician.userId;
+      }
+    }
+
+    if (recipientId && recipientId.toString() !== req.userId.toString()) {
+      await notify(recipientId, {
+        type: 'status_update',
+        message: `Repair request status updated to ${status}`,
+        relatedId: repairRequest._id
+      });
+    }
+
     res.json({
       success: true,
       message: 'Status updated successfully',
@@ -400,7 +464,15 @@ router.post('/:id/quotation', [
       });
     }
 
-    if (repairRequest.technicianId.toString() !== (await Technician.findOne({ userId: req.userId }))._id.toString()) {
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician) {
+      return res.status(404).json({
+        success: false,
+        message: 'Technician profile not found'
+      });
+    }
+
+    if (!repairRequest.technicianId || repairRequest.technicianId.toString() !== technician._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized'
@@ -451,11 +523,29 @@ router.put('/:id/quotation/approve', [
     }
 
     const factory = await Factory.findOne({ userId: req.userId });
+    if (!factory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factory profile not found'
+      });
+    }
+
     if (repairRequest.factoryId.toString() !== factory._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized'
       });
+    }
+
+    if (!repairRequest.quotation || !repairRequest.quotation.submittedAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'No quotation has been submitted for this request'
+      });
+    }
+
+    if (!repairRequest.factoryApproval) {
+      repairRequest.factoryApproval = {};
     }
 
     repairRequest.quotation.approvedByFactory = true;
@@ -510,10 +600,32 @@ router.post('/:id/review', [
     }
 
     const factory = await Factory.findOne({ userId: req.userId });
+    if (!factory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Factory profile not found'
+      });
+    }
+
     if (repairRequest.factoryId.toString() !== factory._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized'
+      });
+    }
+
+    if (!repairRequest.technicianId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No technician is assigned to this request'
+      });
+    }
+
+    const technician = await Technician.findById(repairRequest.technicianId);
+    if (!technician) {
+      return res.status(404).json({
+        success: false,
+        message: 'Technician profile not found'
       });
     }
 
@@ -526,11 +638,13 @@ router.post('/:id/review', [
     await repairRequest.save();
 
     // Update technician ratings
-    const technician = await Technician.findById(repairRequest.technicianId);
+    if (!technician.ratings) {
+      technician.ratings = { average: 0, count: 0 };
+    }
     const newRating = ((technician.ratings.average * technician.ratings.count) + rating) / (technician.ratings.count + 1);
     technician.ratings.average = Math.round(newRating * 10) / 10;
     technician.ratings.count += 1;
-    technician.completedJobs += 1;
+    technician.completedJobs = (technician.completedJobs || 0) + 1;
     await technician.save();
 
     res.json({
