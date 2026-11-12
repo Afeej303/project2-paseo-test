@@ -1,7 +1,21 @@
 const express = require('express');
+const { param, validationResult } = require('express-validator');
 const router = express.Router();
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
+
+// Validation middleware
+const handleValidation = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+  next();
+};
 
 // All routes require authentication
 router.use(auth);
@@ -17,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/notifications/:id/read - Mark notification as read
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', [param('id').isMongoId(), handleValidation], async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },

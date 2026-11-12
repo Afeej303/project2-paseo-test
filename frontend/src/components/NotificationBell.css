@@ -1,0 +1,47 @@
+.notification-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.notification-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 24px;
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 280px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  padding: 10px;
+}
+
+.notification-dropdown p {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+.notification-dropdown button {
+  margin-top: 10px;
+  width: 100%;
+}

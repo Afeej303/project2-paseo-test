@@ -1,0 +1,18 @@
+.select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.select-field {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 16px;
+  background: var(--bg);
+}
+
+.select-field:focus {
+  outline: 2px solid var(--accent-border);
+}

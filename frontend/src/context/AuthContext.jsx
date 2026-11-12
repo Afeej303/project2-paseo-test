@@ -1,37 +1,65 @@
-import React, { createContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState, useContext } from 'react';
 import api from '../services/api';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(() => Boolean(localStorage.getItem('token')));
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.get('/auth/me')
-        .then(res => setUser(res.data.data.user))
-        .catch(() => localStorage.removeItem('token'))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const login = (userData, token) => {
-    localStorage.setItem('token', token);
-    setUser(userData);
-  };
-
-  const logout = () => {
+  const clearSession = useCallback(() => {
     localStorage.removeItem('token');
     setUser(null);
-  };
+    setProfile(null);
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const refreshUser = useCallback(async () => {
+    const response = await api.get('/auth/me');
+    setUser(response.data.data.user);
+    setProfile(response.data.data.profile || null);
+    return response.data.data;
+  }, []);
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return;
+    refreshUser()
+      .catch(clearSession)
+      .finally(() => setLoading(false));
+  }, [clearSession, refreshUser]);
+
+  const login = useCallback((userData, token, profileData = null) => {
+    localStorage.setItem('token', token);
+    setUser(userData);
+    setProfile(profileData);
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      clearSession();
+      return;
+    }
+    clearSession();
+  }, [clearSession]);
+
+  const value = useMemo(() => ({
+    user,
+    profile,
+    loading,
+    login,
+    logout,
+    refreshUser,
+  }), [user, profile, loading, login, logout, refreshUser]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+export default AuthContext;

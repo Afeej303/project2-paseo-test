@@ -1,17 +1,26 @@
 .input-group {
-  margin-bottom: 15px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 0.38rem;
 }
 
 .input-field {
-  padding: 10px;
+  width: 100%;
+  min-height: 2.75rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0.7rem 0.8rem;
 }
 
-.input-field:focus {
-  outline: 2px solid var(--accent-border);
+.input-field:hover,
+select:hover,
+textarea:hover {
+  border-color: #94a3b8;
+}
+
+.input-field:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--brand);
 }

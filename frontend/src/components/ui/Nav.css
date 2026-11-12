@@ -1,45 +1,95 @@
 .navbar {
-  display: flex;
-  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: 4rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  padding: 12px 24px;
+  gap: 1rem;
   border-bottom: 1px solid var(--border);
-}
-
-.navbar-brand {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.navbar-links {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.65rem max(1rem, calc((100vw - 1180px) / 2));
+  backdrop-filter: blur(12px);
 }
 
 .navbar-logo {
+  color: var(--ink-950);
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
   text-decoration: none;
 }
 
-.navbar-user {
-  font-size: 14px;
-  color: var(--text);
-  margin-right: 12px;
+.navbar-links,
+.navbar-account {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-.navbar-link {
-  color: var(--text);
+.navbar-links {
+  overflow-x: auto;
+  justify-content: center;
+  scrollbar-width: thin;
+}
+
+.navbar-account {
+  justify-content: flex-end;
+}
+
+.navbar-link,
+.navbar-button {
+  border-radius: var(--radius-sm);
+  color: var(--ink-600);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 700;
   text-decoration: none;
-  font-size: 14px;
+  white-space: nowrap;
+}
+
+.navbar-link:hover,
+.navbar-link-active {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
 }
 
 .navbar-button {
-  padding: 6px 12px;
-  font-size: 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
+  background: var(--surface);
   cursor: pointer;
-  color: var(--text);
+}
+
+.navbar-user {
+  max-width: 14rem;
+  overflow: hidden;
+  color: var(--ink-600);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 920px) {
+  .navbar {
+    grid-template-columns: auto 1fr;
+  }
+
+  .navbar-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    order: 3;
+  }
+
+  .navbar-account {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .navbar-user {
+    display: none;
+  }
 }
