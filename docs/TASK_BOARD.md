@@ -37,7 +37,7 @@ Status: `Proposed` → `Ready` → `In progress` → `Review` → `Verified` →
 | P0-ADMIN-001 | PROJECT_BRIEF | Admin endpoints + dashboard UI | Backend + Frontend | In progress | P0-AUTH-001 | 2026-11-12 |
 | P0-VERIFY-001 | TESTING_STANDARD | Runtime verify backend | Verifier | In progress | P0-AUTH-002 | 2026-11-12 |
 | P0-UI-001 | PROJECT_BRIEF | Shared UI design system/components | Frontend | Ready | P0-AUTH-001 | 2026-11-12 |
-| P0-STORE-001 | P0-FAULT-001 | File storage hardening (uploads dir, static serve, media guard) | Backend | In progress | P0-FAULT-001 | 2026-11-12 |
+| P0-STORE-001 | P0-FAULT-001 | File storage hardening (uploads dir, static serve, media guard, guards) | Backend | Done | P0-FAULT-001 | 2026-11-12 |
 
 ## P1 - Differentiator Tasks (To be scheduled after P0)
 
@@ -52,9 +52,9 @@ Status: `Proposed` → `Ready` → `In progress` → `Review` → `Verified` →
 ## Handoff notes
 
 - P0-FIX-001 (backend hardening) **completed** — verified by orchestrator.
-- P0-STORE-001 assigned to worker `00c4498b` for uploads hardening.
-- P0-UI-001 / P0-AUTH-003 pending frontend agent.
-- No git repo (commit planned after full P0 completion).
+- P0-STORE-001 **Done** — uploads directory created, static serving enabled, .gitignore covers uploads.
+- P0-UI-001 / P0-AUTH-003 assigned to Frontend agent `fcd68b46` for UI completion.
+- Git repo initialized - committed with initial P0 work.
 
 **Verification evidence (2026-11-12):**
 - `npm test` → PASS (12/12 tests)
