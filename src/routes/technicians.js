@@ -6,7 +6,6 @@ const { isTechnicianOrAdmin } = require('../middleware/roles');
 
 const router = express.Router();
 
-// Validation middleware
 const handleValidation = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -19,9 +18,6 @@ const handleValidation = (req, res, next) => {
   next();
 };
 
-// @route   GET /api/technicians/profile
-// @desc    Get current technician's profile
-// @access  Private (Technician, Admin)
 router.get('/profile', auth, isTechnicianOrAdmin, async (req, res) => {
   try {
     let technician;
@@ -48,6 +44,7 @@ router.get('/profile', auth, isTechnicianOrAdmin, async (req, res) => {
 
     res.json({
       success: true,
+      message: 'Technician profile retrieved successfully',
       data: technician
     });
   } catch (error) {
@@ -55,14 +52,11 @@ router.get('/profile', auth, isTechnicianOrAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get technician profile',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   PUT /api/technicians/profile
-// @desc    Update technician profile
-// @access  Private (Technician, Admin)
 router.put('/profile', [
   auth,
   isTechnicianOrAdmin,
@@ -83,7 +77,8 @@ router.put('/profile', [
           message: 'Technician ID required'
         });
       }
-      technician = await Technician.findByIdAndUpdate(technicianId, req.body, { new: true, runValidators: true });
+      const updateData = { firstName, lastName, phone };
+      technician = await Technician.findByIdAndUpdate(technicianId, updateData, { new: true, runValidators: true });
     } else {
       const updateData = { firstName, lastName, phone };
       technician = await Technician.findOneAndUpdate(
@@ -110,14 +105,11 @@ router.put('/profile', [
     res.status(500).json({
       success: false,
       message: 'Failed to update technician profile',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   PUT /api/technicians/availability
-// @desc    Update availability status
-// @access  Private (Technician)
 router.put('/availability', [
   auth,
   isTechnicianOrAdmin,
@@ -158,14 +150,11 @@ router.put('/availability', [
     res.status(500).json({
       success: false,
       message: 'Failed to update availability',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   PUT /api/technicians/specializations
-// @desc    Update specializations
-// @access  Private (Technician, Admin)
 router.put('/specializations', [
   auth,
   isTechnicianOrAdmin,
@@ -178,11 +167,8 @@ router.put('/specializations', [
     let technician;
     if (req.userRole === 'admin') {
       const technicianId = req.query.id;
-      technician = await Technician.findByIdAndUpdate(
-        technicianId,
-        { specializations, brands },
-        { new: true }
-      );
+      const updateData = { specializations, brands };
+      technician = await Technician.findByIdAndUpdate(technicianId, updateData, { new: true });
     } else {
       technician = await Technician.findOneAndUpdate(
         { userId: req.userId },
@@ -211,14 +197,11 @@ router.put('/specializations', [
     res.status(500).json({
       success: false,
       message: 'Failed to update specializations',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   PUT /api/technicians/service-area
-// @desc    Update service area
-// @access  Private (Technician)
 router.put('/service-area', [
   auth,
   isTechnicianOrAdmin,
@@ -266,14 +249,11 @@ router.put('/service-area', [
     res.status(500).json({
       success: false,
       message: 'Failed to update service area',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   GET /api/technicians
-// @desc    Get all verified technicians or search by criteria
-// @access  Public
 router.get('/', async (req, res) => {
   try {
     const { specialization, city, available, emergency, coordinates, radius } = req.query;
@@ -298,7 +278,6 @@ router.get('/', async (req, res) => {
 
     let techniciansQuery = Technician.find(query).select('-verificationDocuments').sort({ 'ratings.average': -1, totalJobs: -1 });
 
-    // Location-based filtering with geospatial query
     if (coordinates && radius) {
       const [lng, lat] = coordinates.split(',').map(Number);
       if (!isNaN(lat) && !isNaN(lng)) {
@@ -321,6 +300,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
+      message: 'Technicians retrieved successfully',
       data: technicians
     });
   } catch (error) {
@@ -328,14 +308,11 @@ router.get('/', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get technicians',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
 
-// @route   GET /api/technicians/:id
-// @desc    Get technician by ID
-// @access  Public
 router.get('/:id', [
   param('id').isMongoId(),
   handleValidation
@@ -354,6 +331,7 @@ router.get('/:id', [
 
     res.json({
       success: true,
+      message: 'Technician retrieved successfully',
       data: technician
     });
   } catch (error) {
@@ -361,7 +339,7 @@ router.get('/:id', [
     res.status(500).json({
       success: false,
       message: 'Failed to get technician',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });

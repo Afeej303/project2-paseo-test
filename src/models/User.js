@@ -43,11 +43,15 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) {
+    this.updatedAt = Date.now();
+    return next();
+  }
   
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    this.updatedAt = Date.now();
     next();
   } catch (error) {
     next(error);
@@ -78,11 +82,5 @@ userSchema.methods.toJSON = function() {
   delete user.password;
   return user;
 };
-
-// Update timestamp on save
-userSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
 
 module.exports = mongoose.model('User', userSchema);

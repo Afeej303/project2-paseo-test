@@ -14,9 +14,9 @@ router.get('/users', async (req, res) => {
     const { role } = req.query;
     const query = role ? { role } : {};
     const users = await User.find(query);
-    res.json({ success: true, data: users });
+    res.json({ success: true, message: 'Users retrieved successfully', data: users });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', errors: [{ message: error.message }] });
   }
 });
 
@@ -26,9 +26,9 @@ router.put('/users/:id/status', async (req, res) => {
     const { isActive } = req.body;
     const user = await User.findByIdAndUpdate(req.params.id, { isActive }, { new: true });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    res.json({ success: true, data: user });
+    res.json({ success: true, message: 'User status updated', data: user });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', errors: [{ message: error.message }] });
   }
 });
 
@@ -40,9 +40,9 @@ router.put('/technicians/:id/verify', async (req, res) => {
     if (!tech) return res.status(404).json({ success: false, message: 'Technician not found' });
     // Also update User profile
     await User.findByIdAndUpdate(tech.userId, { isVerified });
-    res.json({ success: true, data: tech });
+    res.json({ success: true, message: 'Technician verified', data: tech });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', errors: [{ message: error.message }] });
   }
 });
 
@@ -55,9 +55,9 @@ router.get('/repair-requests', async (req, res) => {
     if (urgency) query.urgency = urgency;
     
     const requests = await RepairRequest.find(query);
-    res.json({ success: true, data: requests });
+    res.json({ success: true, message: 'Repair requests retrieved', data: requests });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', errors: [{ message: error.message }] });
   }
 });
 
@@ -68,9 +68,9 @@ router.get('/stats', async (req, res) => {
       User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]),
       RepairRequest.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }])
     ]);
-    res.json({ success: true, data: { userCounts, requestCounts } });
+    res.json({ success: true, message: 'Statistics retrieved', data: { userCounts, requestCounts } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', errors: [{ message: error.message }] });
   }
 });
 

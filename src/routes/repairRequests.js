@@ -81,7 +81,7 @@ router.post('/', [
     res.status(500).json({
       success: false,
       message: 'Failed to create repair request',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -99,7 +99,11 @@ router.get('/', auth, async (req, res) => {
         query.factoryId = factory._id;
       }
     } else if (req.userRole === 'technician') {
-      query.technicianId = req.userId;
+      const technician = await Technician.findOne({ userId: req.userId });
+      if (!technician) {
+        return res.json({ success: true, data: [] });
+      }
+      query.technicianId = technician._id;
     }
 
     // Status filter
@@ -123,7 +127,7 @@ router.get('/', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get repair requests',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -159,7 +163,7 @@ router.get('/:id', [
     res.status(500).json({
       success: false,
       message: 'Failed to get repair request',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -216,7 +220,7 @@ router.post('/:id/accept', [
     res.status(500).json({
       success: false,
       message: 'Failed to accept request',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -262,7 +266,7 @@ router.post('/:id/reject', [
     res.status(500).json({
       success: false,
       message: 'Failed to reject request',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -288,14 +292,25 @@ router.put('/:id/status', [
     }
 
     // Authorization check: verify user owns this request or is admin
-    const isOwner = req.userRole === 'factory' && repairRequest.factoryId.toString() === req.userId;
-    const isAssignedTechnician = req.userRole === 'technician' && repairRequest.technicianId && repairRequest.technicianId.toString() === req.userId;
+    const factory = req.userRole === 'factory' ? await Factory.findOne({ userId: req.userId }) : null;
+    const technician = req.userRole === 'technician' ? await Technician.findOne({ userId: req.userId }) : null;
+    const isOwner = req.userRole === 'factory' && factory && repairRequest.factoryId.toString() === factory._id.toString();
+    const isAssignedTechnician = req.userRole === 'technician' && technician && repairRequest.technicianId && repairRequest.technicianId.toString() === technician._id.toString();
     const isAdminUser = req.userRole === 'admin';
 
     if (!isOwner && !isAssignedTechnician && !isAdminUser) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this repair request'
+      });
+    }
+
+    // Terminal states cannot transition to anything else
+    const terminalStates = ['rejected', 'completed', 'cancelled'];
+    if (terminalStates.includes(repairRequest.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Repair request is already in terminal state ${repairRequest.status}`
       });
     }
 
@@ -358,7 +373,7 @@ router.put('/:id/status', [
     res.status(500).json({
       success: false,
       message: 'Failed to update status',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -412,7 +427,7 @@ router.post('/:id/quotation', [
     res.status(500).json({
       success: false,
       message: 'Failed to submit quotation',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -460,7 +475,7 @@ router.put('/:id/quotation/approve', [
     res.status(500).json({
       success: false,
       message: 'Failed to approve quotation',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -527,7 +542,7 @@ router.post('/:id/review', [
     res.status(500).json({
       success: false,
       message: 'Failed to submit review',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });

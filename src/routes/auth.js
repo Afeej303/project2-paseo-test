@@ -81,7 +81,7 @@ router.post('/register/factory', [
     res.status(500).json({
       success: false,
       message: 'Registration failed',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -146,7 +146,7 @@ router.post('/register/technician', [
     res.status(500).json({
       success: false,
       message: 'Registration failed',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -199,7 +199,7 @@ router.post('/register/admin', [
     res.status(500).json({
       success: false,
       message: 'Registration failed',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -259,7 +259,7 @@ router.post('/register/admin/bootstrap', [
     res.status(500).json({
       success: false,
       message: 'Failed to create admin',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -330,7 +330,7 @@ router.post('/login', [
     res.status(500).json({
       success: false,
       message: 'Login failed',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -360,7 +360,7 @@ router.get('/me', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get user data',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });

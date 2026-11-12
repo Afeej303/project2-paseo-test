@@ -1,8 +1,11 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const FaultReport = require('../models/FaultReport');
 const Factory = require('../models/Factory');
+const Technician = require('../models/Technician');
 const RepairRequest = require('../models/RepairRequest');
 const auth = require('../middleware/auth');
 const { isFactoryOrAdmin } = require('../middleware/roles');
@@ -10,13 +13,16 @@ const { isFactoryOrAdmin } = require('../middleware/roles');
 const router = express.Router();
 
 // Configure file upload
+const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'fault-reports');
+fs.mkdirSync(uploadDir, { recursive: true });
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/fault-reports/');
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    cb(null, uniqueSuffix + '-' + path.basename(file.originalname));
   }
 });
 
@@ -32,6 +38,28 @@ const upload = multer({
     }
   }
 });
+
+// Translate Multer failures into the standard error envelope
+const uploadMedia = (req, res, next) => {
+  upload.array('media', 5)(req, res, (err) => {
+    if (!err) {
+      return next();
+    }
+
+    let message = err.message || 'File upload failed';
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      message = 'File too large. Maximum size is 10MB';
+    } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      message = 'Too many files or unexpected field';
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: 'Media upload failed',
+      errors: [{ message }]
+    });
+  });
+};
 
 // Validation middleware
 const handleValidation = (req, res, next) => {
@@ -110,7 +138,7 @@ router.post('/', [
     res.status(500).json({
       success: false,
       message: 'Failed to submit fault report',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -122,7 +150,7 @@ router.post('/:id/media', [
   auth,
   isFactoryOrAdmin,
   param('id').isMongoId(),
-  upload.array('media', 5),
+  uploadMedia,
   handleValidation
 ], async (req, res) => {
   try {
@@ -147,6 +175,14 @@ router.post('/:id/media', [
       }
     }
 
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No media files uploaded',
+        errors: [{ message: 'No media files uploaded' }]
+      });
+    }
+
     // Process uploaded files
     const media = req.files.map(file => ({
       type: file.mimetype.startsWith('image/') ? 'image' : 
@@ -167,7 +203,7 @@ router.post('/:id/media', [
     res.status(500).json({
       success: false,
       message: 'Failed to upload media',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -190,7 +226,11 @@ router.get('/', auth, async (req, res) => {
         });
       }
     } else if (req.userRole === 'technician') {
-      query.assignedTechnicianId = req.userId;
+      const technician = await Technician.findOne({ userId: req.userId });
+      if (!technician) {
+        return res.json({ success: true, data: [] });
+      }
+      query.assignedTechnicianId = technician._id;
     }
 
     // Optional filters
@@ -215,7 +255,7 @@ router.get('/', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get fault reports',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -261,7 +301,7 @@ router.get('/:id', [
     res.status(500).json({
       success: false,
       message: 'Failed to get fault report',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -304,7 +344,7 @@ router.put('/:id/status', [
     res.status(500).json({
       success: false,
       message: 'Failed to update status',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -344,7 +384,7 @@ router.put('/:id/assign', [
     res.status(500).json({
       success: false,
       message: 'Failed to assign technician',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });

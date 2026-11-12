@@ -56,7 +56,7 @@ router.get('/profile', auth, isFactoryOrAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get factory profile',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -112,7 +112,7 @@ router.put('/profile', [
     res.status(500).json({
       success: false,
       message: 'Failed to update factory profile',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -166,7 +166,7 @@ router.post('/machines', [
     res.status(500).json({
       success: false,
       message: 'Failed to add machine',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -220,7 +220,7 @@ router.put('/machines/:machineId', [
     res.status(500).json({
       success: false,
       message: 'Failed to update machine',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -272,7 +272,7 @@ router.delete('/machines/:machineId', [
     res.status(500).json({
       success: false,
       message: 'Failed to remove machine',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });
@@ -293,7 +293,7 @@ router.get('/', auth, isFactoryOrAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get factories',
-      error: error.message
+      errors: [{ message: error.message }]
     });
   }
 });

@@ -1,9 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
+
+// Ensure the uploads directory exists before Multer writes to it
+const uploadsRoot = path.join(__dirname, '..', 'uploads');
+const faultReportUploadsDir = path.join(uploadsRoot, 'fault-reports');
+fs.mkdirSync(faultReportUploadsDir, { recursive: true });
 
 // Middleware
 app.use(cors());
@@ -19,6 +26,34 @@ const connectDB = async () => {
     console.error('MongoDB connection error:', error.message);
     process.exit(1);
   }
+};
+
+// First admin bootstrap
+const bootstrapAdmin = async () => {
+  const User = require('./models/User');
+  const initialAdminEmail = process.env.INITIAL_ADMIN_EMAIL;
+  const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+  
+  if (!initialAdminEmail || !initialAdminPassword) {
+    return;
+  }
+  
+  const existingAdmin = await User.findOne({ role: 'admin' });
+  if (existingAdmin) {
+    console.log('Admin user already exists, skipping bootstrap');
+    return;
+  }
+  
+  const admin = new User({
+    email: initialAdminEmail,
+    password: initialAdminPassword,
+    role: 'admin',
+    isVerified: true,
+    isActive: true
+  });
+  
+  await admin.save();
+  console.log(`First admin created: ${initialAdminEmail}`);
 };
 
 // Routes
@@ -43,8 +78,7 @@ app.get('/health', (req, res) => {
 });
 
 // Static file serving for uploads
-const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(uploadsRoot));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -52,7 +86,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({
     success: false,
     message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    errors: process.env.NODE_ENV === 'development' ? [{ message: err.message }] : undefined
   });
 });
 
@@ -69,6 +103,7 @@ const PORT = process.env.PORT || 3000;
 // Start server
 const startServer = async () => {
   await connectDB();
+  await bootstrapAdmin();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
